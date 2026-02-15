@@ -1,0 +1,5 @@
+custom_nodes/
+user/
+output/
+input/
+.env

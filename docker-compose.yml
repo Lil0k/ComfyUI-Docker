@@ -1,0 +1,37 @@
+services:
+  comfyui:
+    build:
+      context: .
+      args:
+        CUDA_VERSION: "12.4.1"
+        TORCH_CUDA: "cu124"
+        COMFYUI_REF: "master"
+    container_name: comfyui
+    ports:
+      - "${COMFYUI_PORT:-8188}:8188"
+    volumes:
+      # Models — mount your existing models directory (read-write so Manager
+      # can download new ones). Adjust the host path in .env or here.
+      - ${MODELS_PATH:?Set MODELS_PATH in .env}:/comfyui/models
+
+      # Custom nodes — bind-mount so they persist on the host drive
+      - ${CUSTOM_NODES_PATH:-./custom_nodes}:/comfyui/custom_nodes
+
+      # User data — saved workflows, settings, templates
+      - ./user:/comfyui/user
+
+      # Output & input — bind-mount to easily access generated images
+      - ${OUTPUT_PATH:-./output}:/comfyui/output
+      - ${INPUT_PATH:-./input}:/comfyui/input
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
+    # Override default CMD to add extra flags (e.g. --highvram, --fp16-vae):
+    # command: ["--listen", "0.0.0.0", "--port", "8188", "--highvram"]
+
