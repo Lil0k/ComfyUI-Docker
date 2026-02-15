@@ -3,8 +3,8 @@ services:
     build:
       context: .
       args:
-        CUDA_VERSION: "12.4.1"
-        TORCH_CUDA: "cu124"
+        CUDA_VERSION: "13.0.1"
+        TORCH_CUDA: "cu130"
         COMFYUI_REF: "master"
     container_name: comfyui
     ports:
@@ -30,6 +30,7 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    shm_size: '8g'
     restart: unless-stopped
 
     # Override default CMD to add extra flags (e.g. --highvram, --fp16-vae):

@@ -1,4 +1,7 @@
 output/
 input/
+custom_nodes/
+user/
 .env
+.git/
 *.md

@@ -4,8 +4,8 @@
 # Build args let you pin or upgrade versions without editing the Dockerfile.
 #
 #   docker build \
-#     --build-arg CUDA_VERSION=12.4.1 \
-#     --build-arg TORCH_CUDA=cu124 \
+#     --build-arg CUDA_VERSION=13.0.1 \
+#     --build-arg TORCH_CUDA=cu130 \
 #     --build-arg COMFYUI_REF=master \
 #     -t comfyui .
 #
@@ -16,11 +16,11 @@
 #   you want a newer stack.
 # =============================================================================
 
-ARG CUDA_VERSION=12.4.1
+ARG CUDA_VERSION=13.0.1
 FROM nvidia/cuda:${CUDA_VERSION}-runtime-ubuntu22.04
 
 # ---- build-time configuration -----------------------------------------------
-ARG TORCH_CUDA=cu124
+ARG TORCH_CUDA=cu130
 ARG COMFYUI_REF=master
 
 # ---- environment ------------------------------------------------------------
@@ -57,8 +57,11 @@ RUN pip install \
 # ---- ComfyUI python dependencies -------------------------------------------
 RUN pip install -r requirements.txt
 
+# ---- common custom-node dependencies (avoids IMPORT FAILED on first boot) --
+RUN pip install opencv-python-headless soundfile piexif gguf
+
 # ---- directory structure for volume mounts ----------------------------------
-RUN mkdir -p models output input custom_nodes
+RUN mkdir -p models output input custom_nodes user
 
 # ---- entrypoint -------------------------------------------------------------
 COPY entrypoint.sh /entrypoint.sh
