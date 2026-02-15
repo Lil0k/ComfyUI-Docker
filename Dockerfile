@@ -32,7 +32,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # ---- system packages --------------------------------------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
         python3 python3-venv python3-dev \
-        git wget curl \
+        git wget curl ffmpeg \
         # OpenCV / image-processing runtime deps
         libgl1-mesa-glx libglib2.0-0 libsm6 libxext6 libxrender1 \
         # needed by some pip packages that compile C extensions
