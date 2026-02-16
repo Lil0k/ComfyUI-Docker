@@ -30,7 +30,7 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    shm_size: '8g'
+    shm_size: '16g'
     restart: unless-stopped
 
     # Override default CMD to add extra flags (e.g. --highvram, --fp16-vae):
