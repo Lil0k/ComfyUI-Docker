@@ -16,11 +16,11 @@
 #   you want a newer stack.
 # =============================================================================
 
-ARG CUDA_VERSION=13.0.1
+ARG CUDA_VERSION=12.6.3
 FROM nvidia/cuda:${CUDA_VERSION}-runtime-ubuntu22.04
 
 # ---- build-time configuration -----------------------------------------------
-ARG TORCH_CUDA=cu130
+ARG TORCH_CUDA=cu126
 ARG COMFYUI_REF=master
 
 # ---- environment ------------------------------------------------------------

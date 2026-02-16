@@ -3,8 +3,8 @@ services:
     build:
       context: .
       args:
-        CUDA_VERSION: "13.0.1"
-        TORCH_CUDA: "cu130"
+        CUDA_VERSION: "12.6.3"
+        TORCH_CUDA: "cu126"
         COMFYUI_REF: "master"
     container_name: comfyui
     ports:
