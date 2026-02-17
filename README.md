@@ -4,26 +4,24 @@ A GPU-accelerated Docker setup for [ComfyUI](https://github.com/comfyanonymous/C
 
 ## Prerequisites
 
-- Docker Desktop with WSL 2 backend
+- Docker (Docker Desktop on Windows/macOS, or Docker Engine on Linux)
 - NVIDIA GPU with up-to-date drivers
 - [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
 
-### WSL 2 Memory Configuration
+### Windows: WSL 2 Memory Configuration
 
-By default WSL 2 limits RAM to 50% of the host's total memory, which may not be enough for large models. To increase it, create or edit `%UserProfile%\.wslconfig`:
+Docker Desktop on Windows runs containers inside WSL 2, which by default limits RAM to 50% of the host's total memory. This may not be enough for large models. To increase it, create or edit `%UserProfile%\.wslconfig`:
 
 ```ini
 [wsl2]
 memory=24GB
 ```
 
-Adjust the value based on your system's total RAM. After saving, restart WSL:
+Adjust the value based on your system's total RAM. After saving, restart WSL and Docker Desktop:
 
 ```
 wsl --shutdown
 ```
-
-Then restart Docker Desktop.
 
 ## Quick Start
 
