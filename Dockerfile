@@ -60,6 +60,17 @@ RUN pip install -r requirements.txt
 # ---- common custom-node dependencies (avoids IMPORT FAILED on first boot) --
 RUN pip install opencv-python-headless soundfile piexif gguf
 
+# ---- custom node requirements (baked in to avoid long startup waits) --------
+# .dockerignore allows only custom_nodes/*/requirements.txt into the context.
+# COPY them in, install everything, then remove the leftovers — the real
+# custom_nodes directory is bind-mounted at runtime.
+COPY custom_nodes/ /tmp/custom_node_reqs/
+RUN for req in /tmp/custom_node_reqs/*/requirements.txt; do \
+        [ -f "$req" ] || continue; \
+        echo "[build] Installing deps from $req"; \
+        pip install -r "$req" || true; \
+    done && rm -rf /tmp/custom_node_reqs
+
 # ---- directory structure for volume mounts ----------------------------------
 RUN mkdir -p models output input custom_nodes user
 

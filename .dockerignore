@@ -1,6 +1,7 @@
 output/
 input/
-custom_nodes/
+custom_nodes/**
+!custom_nodes/*/requirements.txt
 user/
 .env
 .git/
