@@ -10,10 +10,17 @@ if [ ! -d "/comfyui/custom_nodes/ComfyUI-Manager" ]; then
 fi
 
 # ---- Auto-install custom node dependencies ----------------------------------
+# Nodes whose deps were baked in at build time are listed in this manifest.
+BUILT_DEPS="/opt/built_node_deps.txt"
 echo "[entrypoint] Checking custom node requirements..."
 for req in /comfyui/custom_nodes/*/requirements.txt; do
     [ -f "$req" ] || continue
-    echo "[entrypoint]   Installing deps from $req"
+    node_name=$(basename "$(dirname "$req")")
+    if [ -f "$BUILT_DEPS" ] && grep -qxF "$node_name" "$BUILT_DEPS"; then
+        echo "[entrypoint]   $node_name — deps baked in, skipping"
+        continue
+    fi
+    echo "[entrypoint]   Installing deps for $node_name"
     pip install -q -r "$req" 2>/dev/null || true
 done
 

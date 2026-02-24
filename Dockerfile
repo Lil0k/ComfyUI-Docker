@@ -65,10 +65,13 @@ RUN pip install opencv-python-headless soundfile piexif gguf
 # COPY them in, install everything, then remove the leftovers — the real
 # custom_nodes directory is bind-mounted at runtime.
 COPY custom_nodes/ /tmp/custom_node_reqs/
-RUN for req in /tmp/custom_node_reqs/*/requirements.txt; do \
+RUN mkdir -p /opt && : > /opt/built_node_deps.txt && \
+    for req in /tmp/custom_node_reqs/*/requirements.txt; do \
         [ -f "$req" ] || continue; \
-        echo "[build] Installing deps from $req"; \
+        node_name=$(basename "$(dirname "$req")"); \
+        echo "[build] Installing deps for $node_name"; \
         pip install -r "$req" || true; \
+        echo "$node_name" >> /opt/built_node_deps.txt; \
     done && rm -rf /tmp/custom_node_reqs
 
 # ---- directory structure for volume mounts ----------------------------------

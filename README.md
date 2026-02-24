@@ -98,6 +98,6 @@ command: ["--listen", "0.0.0.0", "--port", "8188", "--highvram"]
 - **Models are volume-mounted, not baked in** -- share an existing models directory directly into the container.
 - **Custom nodes persist on the host** -- bind-mounted from `CUSTOM_NODES_PATH`, so anything installed via Manager survives container rebuilds.
 - **ComfyUI-Manager auto-installs on first run** -- lives in the persistent custom nodes directory and can update itself.
-- **Custom node dependencies are pre-installed at build time** -- any `requirements.txt` found in `custom_nodes/*/` is installed during `docker build` to avoid long first-boot waits. They are also re-checked at container startup.
+- **Custom node dependencies are pre-installed at build time** -- any `requirements.txt` found in `custom_nodes/*/` is installed during `docker build` and the node names are saved to a manifest (`/opt/built_node_deps.txt`). On container startup, nodes in the manifest are skipped entirely; only nodes added after the last image build trigger a `pip install`. Rebuild the image (`docker compose up --build`) after adding new custom nodes to bake their deps in too.
 - **`shm_size: 16g`** -- PyTorch uses shared memory for data loading; the default 64 MB is too small and causes crashes.
 - **All versions are parameterized** -- pin or bump CUDA, PyTorch, and ComfyUI versions via build args without editing the Dockerfile.
