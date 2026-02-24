@@ -9,6 +9,14 @@ if [ ! -d "/comfyui/custom_nodes/ComfyUI-Manager" ]; then
         /comfyui/custom_nodes/ComfyUI-Manager
 fi
 
+# ---- comfy-pilot (auto-install on first run) --------------------------------
+if [ ! -d "/comfyui/custom_nodes/comfy-pilot" ]; then
+    echo "[entrypoint] comfy-pilot not found — installing..."
+    git clone --depth 1 \
+        https://github.com/ConstantineB6/comfy-pilot.git \
+        /comfyui/custom_nodes/comfy-pilot
+fi
+
 # ---- Auto-install custom node dependencies ----------------------------------
 # Nodes whose deps were baked in at build time are listed in this manifest.
 BUILT_DEPS="/opt/built_node_deps.txt"

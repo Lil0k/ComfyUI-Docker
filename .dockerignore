@@ -6,3 +6,6 @@ user/
 .env
 .git/
 *.md
+*.json
+__pycache__/
+*.py
