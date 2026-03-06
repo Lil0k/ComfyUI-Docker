@@ -3,24 +3,19 @@
 # =============================================================================
 # Build args let you pin or upgrade versions without editing the Dockerfile.
 #
-#   docker build \
-#     --build-arg CUDA_VERSION=13.0.1 \
-#     --build-arg TORCH_CUDA=cu130 \
-#     --build-arg COMFYUI_REF=master \
-#     -t comfyui .
+#   docker compose --env-file .env --env-file .env.rtx5090 up --build
 #
 # CUDA compatibility note:
 #   The CUDA toolkit version in the container must be <= the version supported
-#   by the NVIDIA driver on the host. A 12.4 container works fine on a host
-#   whose driver supports 12.8. Bump CUDA_VERSION + TORCH_CUDA together when
-#   you want a newer stack.
+#   by the NVIDIA driver on the host. Bump CUDA_VERSION + TORCH_CUDA together
+#   when you want a newer stack. See .env.rtx* files for GPU-specific presets.
 # =============================================================================
 
-ARG CUDA_VERSION=12.6.3
+ARG CUDA_VERSION
 FROM nvidia/cuda:${CUDA_VERSION}-runtime-ubuntu22.04
 
 # ---- build-time configuration -----------------------------------------------
-ARG TORCH_CUDA=cu126
+ARG TORCH_CUDA
 ARG COMFYUI_REF=master
 
 # ---- environment ------------------------------------------------------------
@@ -47,7 +42,7 @@ WORKDIR /comfyui
 
 # ---- ComfyUI core -----------------------------------------------------------
 RUN git clone --depth 1 --branch ${COMFYUI_REF} \
-        https://github.com/comfyanonymous/ComfyUI.git .
+        https://github.com/Comfy-Org/ComfyUI.git .
 
 # ---- PyTorch (installed before requirements.txt so pip doesn't re-resolve) ---
 RUN pip install \

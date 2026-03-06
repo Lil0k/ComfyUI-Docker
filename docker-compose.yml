@@ -3,10 +3,11 @@ services:
     build:
       context: .
       args:
-        CUDA_VERSION: "12.6.3"
-        TORCH_CUDA: "cu126"
-        COMFYUI_REF: "master"
-    container_name: comfyui
+        CUDA_VERSION: ${CUDA_VERSION:?Set CUDA_VERSION in your .env.* file}
+        TORCH_CUDA: ${TORCH_CUDA:?Set TORCH_CUDA in your .env.* file}
+        COMFYUI_REF: ${COMFYUI_REF:-master}
+    image: comfyui:${GPU_TAG:-custom}
+    container_name: comfyui-${GPU_TAG:-custom}
     ports:
       - "${COMFYUI_PORT:-8188}:8188"
     volumes:

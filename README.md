@@ -33,10 +33,22 @@ wsl --shutdown
 
    Edit `.env` to point `MODELS_PATH` at your existing models directory (should follow ComfyUI's layout: `checkpoints/`, `loras/`, `vae/`, `controlnet/`, etc.).
 
-2. **Build and start:**
+2. **Build and start** (pick the env file that matches your GPU):
 
    ```bash
-   docker compose up --build -d
+   # RTX 3090 Ti (CUDA 12.6, PyTorch cu126)
+   docker compose --env-file .env --env-file .env.rtx3090ti up --build -d
+
+   # RTX 5090 (CUDA 13.0, PyTorch cu130)
+   docker compose --env-file .env --env-file .env.rtx5090 up --build -d
+   ```
+
+   The image and container are tagged with the GPU name (e.g. `comfyui:rtx3090ti`, `comfyui-rtx3090ti`), so you can have both images built side by side.
+
+   To **run an already-built image** without rebuilding, omit `--build`:
+
+   ```bash
+   docker compose --env-file .env --env-file .env.rtx3090ti up -d
    ```
 
 3. **Open the UI:** [http://localhost:8188](http://localhost:8188)
@@ -46,18 +58,20 @@ wsl --shutdown
 4. **View logs / stop:**
 
    ```bash
-   docker compose logs -f
-   docker compose down
+   docker compose --env-file .env --env-file .env.rtx3090ti logs -f
+   docker compose --env-file .env --env-file .env.rtx3090ti down
    ```
 
 ## Project Structure
 
 | File | Purpose |
 |---|---|
-| `Dockerfile` | CUDA 12.6 + Python 3.10 + PyTorch + ComfyUI |
+| `Dockerfile` | CUDA + Python + PyTorch + ComfyUI (versions are parameterized) |
 | `entrypoint.sh` | Auto-installs ComfyUI-Manager and Comfy Pilot on first boot, installs custom node deps, then launches ComfyUI |
 | `docker-compose.yml` | GPU passthrough, volume mounts, port mapping |
-| `.env` | Configurable host paths and port |
+| `.env` | Shared config: host paths and port |
+| `.env.rtx3090ti` | GPU-specific build args for RTX 3090 Ti (CUDA 12.6, cu126) |
+| `.env.rtx5090` | GPU-specific build args for RTX 5090 (CUDA 13.0, cu130) |
 | `.dockerignore` | Keeps large directories out of the build context (only lets `custom_nodes/*/requirements.txt` through) |
 
 ## Configuration
@@ -72,18 +86,51 @@ wsl --shutdown
 | `INPUT_PATH` | `./input` | Host path for input images |
 | `COMFYUI_PORT` | `8188` | Port exposed on the host |
 
-### Build Args
+### GPU-Specific Build Configuration
 
-Override at build time to change the stack versions:
+Build args are defined in `.env.<gpu>` files and passed through `docker-compose.yml`:
 
-```bash
-docker compose build \
-  --build-arg CUDA_VERSION=12.6.3 \
-  --build-arg TORCH_CUDA=cu126 \
-  --build-arg COMFYUI_REF=v0.13.0
-```
+| Variable | Description | Example |
+|---|---|---|
+| `CUDA_VERSION` | NVIDIA CUDA base image version | `12.6.3`, `13.0.1` |
+| `TORCH_CUDA` | PyTorch CUDA wheel variant | `cu126`, `cu130` |
+| `GPU_TAG` | Tag for the image and container name | `rtx3090ti`, `rtx5090` |
+| `COMFYUI_REF` | ComfyUI git ref (branch/tag) | `master`, `v0.16.3` |
 
 The CUDA toolkit version in the container must be **<=** the version supported by the NVIDIA driver on the host.
+
+#### Adding support for another GPU
+
+Create a new `.env.<gpu>` file with the appropriate versions. For example, for an RTX 4090:
+
+```bash
+# .env.rtx4090
+CUDA_VERSION=12.8.1
+TORCH_CUDA=cu128
+GPU_TAG=rtx4090
+```
+
+Then build with:
+
+```bash
+docker compose --env-file .env --env-file .env.rtx4090 up --build -d
+```
+
+#### One-off overrides
+
+You can override any variable directly on the command line:
+
+```bash
+CUDA_VERSION=12.8.1 TORCH_CUDA=cu128 GPU_TAG=test \
+  docker compose --env-file .env up --build -d
+```
+
+Or pin a specific ComfyUI version:
+
+```bash
+docker compose --env-file .env --env-file .env.rtx5090 build \
+  --build-arg COMFYUI_REF=v0.16.3
+```
 
 ### Extra ComfyUI Flags
 
@@ -102,7 +149,7 @@ Comfy Pilot is auto-installed on first container startup (just like ComfyUI-Mana
 ### How It Works
 
 ```
-Windows host                        Docker container
+Host machine                        Docker container
 ────────────                        ────────────────
 Claude Code CLI                     ComfyUI + Comfy Pilot plugin
      │                                   │
@@ -112,13 +159,13 @@ Claude Code CLI                     ComfyUI + Comfy Pilot plugin
      │                   localhost:8188
 ```
 
-Claude Code runs on your host and spawns the MCP server (a pure-stdlib Python script) as a subprocess. The MCP server talks to ComfyUI inside Docker over `localhost:8188` (the port-forwarded from the container). The browser-side JS syncs the live canvas state to the server, so Claude Code can read and manipulate it.
+Claude Code runs on your host and spawns the MCP server (a pure-stdlib Python script) as a subprocess. The MCP server talks to ComfyUI inside Docker over `localhost:8188` (port-forwarded from the container). The browser-side JS syncs the live canvas state to the server, so Claude Code can read and manipulate it.
 
 ### Setup (One-Time, After First `docker compose up`)
 
 1. **Make sure the container has started at least once** so that `comfy-pilot` is cloned into your `custom_nodes/` directory.
 
-2. **Register the MCP server with Claude Code** (run this on your Windows host):
+2. **Register the MCP server with Claude Code** (run this on your host):
 
    ```bash
    claude mcp add comfyui -- python ./custom_nodes/comfy-pilot/mcp_server.py
@@ -152,7 +199,7 @@ Claude Code runs on your host and spawns the MCP server (a pure-stdlib Python sc
 
 ### Notes
 
-- The embedded terminal panel in ComfyUI's UI does not work on Windows (PTY limitation). Use Claude Code from your normal terminal instead.
+- On Windows, the embedded terminal panel in ComfyUI's UI is disabled (PTY limitation). Use Claude Code from your normal terminal instead.
 - The MCP server auto-discovers ComfyUI at `localhost:8188`. If you changed `COMFYUI_PORT` in `.env`, the server will still probe common ports and find it.
 
 ## Design Decisions
