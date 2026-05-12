@@ -12,10 +12,12 @@
 # =============================================================================
 
 ARG CUDA_VERSION
-FROM nvidia/cuda:${CUDA_VERSION}-runtime-ubuntu22.04
+ARG CUDA_VARIANT=runtime
+FROM nvidia/cuda:${CUDA_VERSION}-${CUDA_VARIANT}-ubuntu22.04
 
 # ---- build-time configuration -----------------------------------------------
 ARG TORCH_CUDA
+ARG TORCH_CHANNEL=stable
 ARG COMFYUI_REF=master
 
 # ---- environment ------------------------------------------------------------
@@ -32,6 +34,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libgl1-mesa-glx libglib2.0-0 libsm6 libxext6 libxrender1 \
         # needed by some pip packages that compile C extensions
         build-essential \
+        # SSH/SFTP server (optional, activated by PUBLIC_KEY env var at runtime)
+        openssh-server \
+    && mkdir -p /var/run/sshd \
     && rm -rf /var/lib/apt/lists/*
 
 # ---- python virtual environment ---------------------------------------------
@@ -45,9 +50,15 @@ RUN git clone --depth 1 --branch ${COMFYUI_REF} \
         https://github.com/Comfy-Org/ComfyUI.git .
 
 # ---- PyTorch (installed before requirements.txt so pip doesn't re-resolve) ---
-RUN pip install \
-        torch torchvision torchaudio \
-        --index-url https://download.pytorch.org/whl/${TORCH_CUDA}
+# TORCH_CHANNEL: "stable" → release wheels, "nightly" → --pre nightly wheels.
+# Blackwell (sm_120) GPUs require nightly builds until PyTorch stable adds sm_120.
+RUN if [ "$TORCH_CHANNEL" = "nightly" ]; then \
+        pip install --pre torch torchvision torchaudio \
+            --index-url https://download.pytorch.org/whl/nightly/${TORCH_CUDA}; \
+    else \
+        pip install torch torchvision torchaudio \
+            --index-url https://download.pytorch.org/whl/${TORCH_CUDA}; \
+    fi
 
 # ---- ComfyUI python dependencies -------------------------------------------
 RUN pip install -r requirements.txt
@@ -76,7 +87,7 @@ RUN mkdir -p models output input custom_nodes user
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-EXPOSE 8188
+EXPOSE 8188 22
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["--listen", "0.0.0.0", "--port", "8188"]

@@ -45,6 +45,12 @@ wsl --shutdown
 
    The image and container are tagged with the GPU name (e.g. `comfyui:rtx3090ti`, `comfyui-rtx3090ti`), so you can have both images built side by side.
 
+   To **build only** (without starting):
+
+   ```bash
+   docker compose --env-file .env --env-file .env.rtx5090 build
+   ```
+
    To **run an already-built image** without rebuilding, omit `--build`:
 
    ```bash
@@ -71,7 +77,7 @@ wsl --shutdown
 | `docker-compose.yml` | GPU passthrough, volume mounts, port mapping |
 | `.env` | Shared config: host paths and port |
 | `.env.rtx3090ti` | GPU-specific build args for RTX 3090 Ti (CUDA 12.6, cu126) |
-| `.env.rtx5090` | GPU-specific build args for RTX 5090 (CUDA 13.0, cu130) |
+| `.env.rtx5090` | GPU-specific build args for RTX 5090 / Blackwell (CUDA 12.8, PyTorch nightly cu128) |
 | `.dockerignore` | Keeps large directories out of the build context (only lets `custom_nodes/*/requirements.txt` through) |
 
 ## Configuration
@@ -92,12 +98,16 @@ Build args are defined in `.env.<gpu>` files and passed through `docker-compose.
 
 | Variable | Description | Example |
 |---|---|---|
-| `CUDA_VERSION` | NVIDIA CUDA base image version | `12.6.3`, `13.0.1` |
-| `TORCH_CUDA` | PyTorch CUDA wheel variant | `cu126`, `cu130` |
+| `CUDA_VERSION` | NVIDIA CUDA base image version | `12.6.3`, `12.8.1` |
+| `CUDA_VARIANT` | CUDA base image type (`runtime` or `devel`) | `runtime`, `devel` |
+| `TORCH_CUDA` | PyTorch CUDA wheel variant | `cu126`, `cu128` |
+| `TORCH_CHANNEL` | `stable` for release wheels, `nightly` for pre-release | `stable`, `nightly` |
 | `GPU_TAG` | Tag for the image and container name | `rtx3090ti`, `rtx5090` |
 | `COMFYUI_REF` | ComfyUI git ref (branch/tag) | `master`, `v0.16.3` |
 
 The CUDA toolkit version in the container must be **<=** the version supported by the NVIDIA driver on the host.
+
+> **Blackwell GPUs (RTX 50-series):** As of March 2026, stable PyTorch does **not** ship sm_120 kernels. You must use `TORCH_CHANNEL=nightly` and PyTorch nightly builds. The `.env.rtx5090` preset is already configured for this. Also use `CUDA_VARIANT=devel` — the runtime image causes CUBLAS errors on Blackwell.
 
 #### Adding support for another GPU
 
@@ -108,6 +118,7 @@ Create a new `.env.<gpu>` file with the appropriate versions. For example, for a
 CUDA_VERSION=12.8.1
 TORCH_CUDA=cu128
 GPU_TAG=rtx4090
+# Add TORCH_CHANNEL=nightly if stable PyTorch doesn't support your GPU yet
 ```
 
 Then build with:
@@ -138,6 +149,56 @@ Uncomment and edit the `command:` line in `docker-compose.yml` to pass additiona
 
 ```yaml
 command: ["--listen", "0.0.0.0", "--port", "8188", "--highvram"]
+```
+
+## Cloud Deployment (RunPod, etc.)
+
+The image supports cloud platforms where a persistent network volume is mounted (e.g. RunPod mounts it at `/workspace`). Set environment variables to point at existing directories on the volume — the entrypoint will symlink them into the container's ComfyUI installation.
+
+The same `MODELS_PATH`, `CUSTOM_NODES_PATH`, `OUTPUT_PATH`, and `INPUT_PATH` variables from `.env` are reused. When running without docker-compose, set them as container env vars — the entrypoint will symlink them into `/comfyui/`.
+
+### RunPod Setup
+
+1. **Push the image to Docker Hub** (or any public registry):
+
+   ```bash
+   docker compose --env-file .env --env-file .env.rtx5090 build
+   docker tag comfyui:rtx5090 yourusername/comfyui:rtx5090
+   docker push yourusername/comfyui:rtx5090
+   ```
+
+2. **Create a RunPod pod template** with:
+   - **Container image:** `yourusername/comfyui:rtx5090`
+   - **Expose HTTP port:** `8188`
+   - **Environment variables:**
+     ```
+     MODELS_PATH=/workspace/ComfyUI/models
+     CUSTOM_NODES_PATH=/workspace/ComfyUI/custom_nodes
+     OUTPUT_PATH=/workspace/ComfyUI/output
+     INPUT_PATH=/workspace/ComfyUI/input
+     USER_PATH=/workspace/ComfyUI/user
+     PUBLIC_KEY=ssh-ed25519 AAAA... your-key-here
+     ```
+   - **Volume mount path:** `/workspace` (RunPod default)
+
+3. The entrypoint auto-detects these paths and symlinks them, so your existing models and nodes are available immediately.
+
+### SSH/SFTP Access
+
+Set the `PUBLIC_KEY` environment variable to your SSH public key to enable SSH/SFTP on port 22. This is useful for uploading files to RunPod (models, images, etc.) via SFTP clients like FileZilla or WinSCP.
+
+```bash
+# Also works with docker run
+docker run --gpus all -p 8188:8188 -p 22:22 \
+  -e PUBLIC_KEY="ssh-ed25519 AAAA..." \
+  comfyui:rtx5090
+```
+
+On RunPod, port 22 is exposed automatically when SSH is enabled in the pod settings. Connect with:
+
+```bash
+ssh root@<pod-ip> -p <exposed-port>
+sftp root@<pod-ip> -P <exposed-port>
 ```
 
 ## Comfy Pilot (Claude Code Integration)
