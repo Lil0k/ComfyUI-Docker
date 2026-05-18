@@ -19,6 +19,10 @@ FROM nvidia/cuda:${CUDA_VERSION}-${CUDA_VARIANT}-ubuntu22.04
 ARG TORCH_CUDA
 ARG TORCH_CHANNEL=stable
 ARG COMFYUI_REF=master
+# INSTALL_NODE_DEPS: "true" → bake custom-node requirements into the image,
+# "false" → skip them at build time (they install on first boot instead).
+# Skipping keeps the image small / build fast when the node set changes often.
+ARG INSTALL_NODE_DEPS=true
 
 # ---- environment ------------------------------------------------------------
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -70,15 +74,22 @@ RUN pip install opencv-python-headless soundfile piexif gguf
 # .dockerignore allows only custom_nodes/*/requirements.txt into the context.
 # COPY them in, install everything, then remove the leftovers — the real
 # custom_nodes directory is bind-mounted at runtime.
+# /opt/built_node_deps.txt lists nodes whose deps are baked in; the entrypoint
+# reads it to decide what to (re)install at runtime. When INSTALL_NODE_DEPS is
+# "false" the file is left empty, so the entrypoint installs everything on boot.
 COPY custom_nodes/ /tmp/custom_node_reqs/
 RUN mkdir -p /opt && : > /opt/built_node_deps.txt && \
-    for req in /tmp/custom_node_reqs/*/requirements.txt; do \
-        [ -f "$req" ] || continue; \
-        node_name=$(basename "$(dirname "$req")"); \
-        echo "[build] Installing deps for $node_name"; \
-        pip install -r "$req" || true; \
-        echo "$node_name" >> /opt/built_node_deps.txt; \
-    done && rm -rf /tmp/custom_node_reqs
+    if [ "$INSTALL_NODE_DEPS" = "true" ]; then \
+        for req in /tmp/custom_node_reqs/*/requirements.txt; do \
+            [ -f "$req" ] || continue; \
+            node_name=$(basename "$(dirname "$req")"); \
+            echo "[build] Installing deps for $node_name"; \
+            pip install -r "$req" || true; \
+            echo "$node_name" >> /opt/built_node_deps.txt; \
+        done; \
+    else \
+        echo "[build] INSTALL_NODE_DEPS=false — skipping custom-node dep bake-in"; \
+    fi && rm -rf /tmp/custom_node_reqs
 
 # ---- directory structure for volume mounts ----------------------------------
 RUN mkdir -p models output input custom_nodes user
