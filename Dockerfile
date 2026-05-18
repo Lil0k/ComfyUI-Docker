@@ -19,10 +19,19 @@ FROM nvidia/cuda:${CUDA_VERSION}-${CUDA_VARIANT}-ubuntu22.04
 ARG TORCH_CUDA
 ARG TORCH_CHANNEL=stable
 ARG COMFYUI_REF=master
+# TORCH_VERSION: optional pin (e.g. "2.11.0"). Empty → install latest for the
+# channel. Pin this when a downstream package (e.g. nunchaku) ships wheels
+# built against a specific torch minor version.
+ARG TORCH_VERSION=
 # INSTALL_NODE_DEPS: "true" → bake custom-node requirements into the image,
 # "false" → skip them at build time (they install on first boot instead).
 # Skipping keeps the image small / build fast when the node set changes often.
 ARG INSTALL_NODE_DEPS=true
+# INSTALL_NUNCHAKU: "true" → install the nunchaku SVDQuant 4-bit inference
+# engine. NUNCHAKU_VERSION selects the release; the wheel is auto-matched to
+# the installed torch + python and the CUDA tag derived from TORCH_CUDA.
+ARG INSTALL_NUNCHAKU=false
+ARG NUNCHAKU_VERSION=1.2.1
 
 # ---- environment ------------------------------------------------------------
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -55,12 +64,14 @@ RUN git clone --depth 1 --branch ${COMFYUI_REF} \
 
 # ---- PyTorch (installed before requirements.txt so pip doesn't re-resolve) ---
 # TORCH_CHANNEL: "stable" → release wheels, "nightly" → --pre nightly wheels.
-# Blackwell (sm_120) GPUs require nightly builds until PyTorch stable adds sm_120.
-RUN if [ "$TORCH_CHANNEL" = "nightly" ]; then \
-        pip install --pre torch torchvision torchaudio \
+# TORCH_VERSION: optional exact pin for the torch package (see ARG above).
+RUN TORCH_PKG="torch"; \
+    [ -n "$TORCH_VERSION" ] && TORCH_PKG="torch==${TORCH_VERSION}"; \
+    if [ "$TORCH_CHANNEL" = "nightly" ]; then \
+        pip install --pre $TORCH_PKG torchvision torchaudio \
             --index-url https://download.pytorch.org/whl/nightly/${TORCH_CUDA}; \
     else \
-        pip install torch torchvision torchaudio \
+        pip install $TORCH_PKG torchvision torchaudio \
             --index-url https://download.pytorch.org/whl/${TORCH_CUDA}; \
     fi
 
@@ -69,6 +80,27 @@ RUN pip install -r requirements.txt
 
 # ---- common custom-node dependencies (avoids IMPORT FAILED on first boot) --
 RUN pip install opencv-python-headless soundfile piexif gguf
+
+# ---- Nunchaku (optional — SVDQuant 4-bit inference engine) ------------------
+# Prebuilt wheels are version-locked to torch (major.minor), python (cpXY) and
+# CUDA. We derive all three at build time: torch/python from the running venv,
+# the CUDA tag from TORCH_CUDA (cu12.8 wheels for cu128, cu13.0 for cu13x).
+# Releases: https://github.com/nunchaku-tech/nunchaku/releases
+RUN if [ "$INSTALL_NUNCHAKU" = "true" ]; then \
+        set -eu; \
+        torch_mm=$(python -c "import torch; print('.'.join(torch.__version__.split('+')[0].split('.')[:2]))"); \
+        py_tag=$(python -c "import sys; print('cp%d%d' % sys.version_info[:2])"); \
+        case "$TORCH_CUDA" in \
+            cu13*) cu_tag="cu13.0" ;; \
+            *)     cu_tag="cu12.8" ;; \
+        esac; \
+        whl="nunchaku-${NUNCHAKU_VERSION}+${cu_tag}torch${torch_mm}-${py_tag}-${py_tag}-linux_x86_64.whl"; \
+        url="https://github.com/nunchaku-tech/nunchaku/releases/download/v${NUNCHAKU_VERSION}/${whl}"; \
+        echo "[build] Installing nunchaku: $url"; \
+        pip install "$url"; \
+    else \
+        echo "[build] INSTALL_NUNCHAKU=false — skipping nunchaku install"; \
+    fi
 
 # ---- custom node requirements (baked in to avoid long startup waits) --------
 # .dockerignore allows only custom_nodes/*/requirements.txt into the context.

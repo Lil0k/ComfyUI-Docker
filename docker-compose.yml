@@ -7,8 +7,11 @@ services:
         CUDA_VARIANT: ${CUDA_VARIANT:-runtime}
         TORCH_CUDA: ${TORCH_CUDA:?Set TORCH_CUDA in your .env.* file}
         TORCH_CHANNEL: ${TORCH_CHANNEL:-stable}
+        TORCH_VERSION: ${TORCH_VERSION:-}
         COMFYUI_REF: ${COMFYUI_REF:-master}
         INSTALL_NODE_DEPS: ${INSTALL_NODE_DEPS:-true}
+        INSTALL_NUNCHAKU: ${INSTALL_NUNCHAKU:-false}
+        NUNCHAKU_VERSION: ${NUNCHAKU_VERSION:-1.2.1}
     image: comfyui:${GPU_TAG:-custom}
     container_name: comfyui-${GPU_TAG:-custom}
     ports:
